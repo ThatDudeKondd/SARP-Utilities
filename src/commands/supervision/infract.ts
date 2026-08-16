@@ -47,7 +47,9 @@ export default defineCommand({
     );
 
     if (ctx.channel?.isSendable()) {
-      await ctx.channel.send({ embeds: [embed] });
+      const reply = await ctx.channel.send({ embeds: [embed] });
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await reply.delete();
     }
 
     logger.info("Infractee Database Data:", infracteeData);
