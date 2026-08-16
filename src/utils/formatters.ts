@@ -1,37 +1,43 @@
-import { EmbedBuilder, APIEmbedField } from "discord.js";
+import { EmbedBuilder, APIEmbedField, User } from "discord.js";
 import { CONSTANTS } from "../config/constants.js";
+
+/**
+ * Shared base for every embed: consistent color handling, timestamp, and
+ * footer branding, so individual builders below only set what's unique
+ * to them.
+ */
+function baseEmbed(color: number): EmbedBuilder {
+  return new EmbedBuilder()
+    .setColor(color)
+    .setTimestamp()
+    .setFooter({ text: CONSTANTS.EMBED_FOOTER_TEXT });
+}
 
 export function createSuccessEmbed(
   title: string,
   description: string,
 ): EmbedBuilder {
-  return new EmbedBuilder()
-    .setTitle(title)
-    .setDescription(description)
-    .setColor(CONSTANTS.EMBED_SUCCESS_COLOR)
-    .setTimestamp();
+  return baseEmbed(CONSTANTS.EMBED_SUCCESS_COLOR)
+    .setTitle(`✅  ${title}`)
+    .setDescription(description);
 }
 
 export function createErrorEmbed(
   title: string,
   description: string,
 ): EmbedBuilder {
-  return new EmbedBuilder()
-    .setTitle(title)
-    .setDescription(description)
-    .setColor(CONSTANTS.EMBED_ERROR_COLOR)
-    .setTimestamp();
+  return baseEmbed(CONSTANTS.EMBED_ERROR_COLOR)
+    .setTitle(`❌  ${title}`)
+    .setDescription(description);
 }
 
 export function createWarningEmbed(
   title: string,
   description: string,
 ): EmbedBuilder {
-  return new EmbedBuilder()
-    .setTitle(title)
-    .setDescription(description)
-    .setColor(CONSTANTS.EMBED_WARNING_COLOR)
-    .setTimestamp();
+  return baseEmbed(CONSTANTS.EMBED_WARNING_COLOR)
+    .setTitle(`⚠️  ${title}`)
+    .setDescription(description);
 }
 
 export function createInfoEmbed(
@@ -39,17 +45,59 @@ export function createInfoEmbed(
   description: string,
   fields: APIEmbedField[] = [],
 ): EmbedBuilder {
-  const embed = new EmbedBuilder()
-    .setTitle(title)
-    .setDescription(description)
-    .setColor(CONSTANTS.EMBED_COLOR)
-    .setTimestamp();
+  const embed = baseEmbed(CONSTANTS.EMBED_COLOR)
+    .setTitle(`ℹ️  ${title}`)
+    .setDescription(description);
 
   if (fields.length > 0) {
     embed.addFields(fields.slice(0, CONSTANTS.MAX_EMBED_FIELDS));
   }
 
   return embed;
+}
+
+export interface InfractionEmbedOptions {
+  /** The user receiving the infraction. */
+  infractee: User;
+  /** The staff member issuing it. */
+  moderator: User;
+  punishment: string;
+  reason: string;
+  /** Optional case/ticket number, shown in the title when provided. */
+  caseNumber?: number;
+}
+
+/**
+ * Dedicated embed for `/infract` and anywhere else an infraction needs to
+ * be displayed. Distinct color from the generic error embed so moderation
+ * actions are visually recognizable at a glance in a busy log channel.
+ */
+export function createInfractionEmbed(
+  options: InfractionEmbedOptions,
+): EmbedBuilder {
+  const { infractee, moderator, punishment, reason, caseNumber } = options;
+
+  return baseEmbed(CONSTANTS.EMBED_INFRACTION_COLOR)
+    .setAuthor({
+      name: infractee.tag,
+      iconURL: infractee.displayAvatarURL(),
+    })
+    .setTitle(
+      caseNumber !== undefined
+        ? `🛑  Infraction Issued — Case #${caseNumber}`
+        : "🛑  Infraction Issued",
+    )
+    .setThumbnail(infractee.displayAvatarURL({ size: 256 }))
+    .addFields(
+      {
+        name: "User",
+        value: `${infractee} (\`${infractee.id}\`)`,
+        inline: true,
+      },
+      { name: "Punishment", value: punishment, inline: true },
+      { name: "Moderator", value: `${moderator}`, inline: true },
+      { name: "Reason", value: truncateString(reason) },
+    );
 }
 
 export function truncateString(

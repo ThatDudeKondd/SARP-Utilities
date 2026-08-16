@@ -1,7 +1,7 @@
 import { prisma } from "../../database/client.js";
 import { defineCommand } from "../../utils/defineCommand.js";
 import { logger } from "../../utils/logger.js";
-import { createSuccessEmbed } from "../../utils/formatters.js";
+import { createInfractionEmbed } from "../../utils/formatters.js";
 import { MessageFlags } from "discord.js";
 
 export default defineCommand({
@@ -41,10 +41,16 @@ export default defineCommand({
       where: { userId: infractee?.id },
     });
 
-    const embed = createSuccessEmbed(
-      "User infracted successfully",
-      `User: ${infractee?.tag}\nPunishment: ${punishment}\nReason: ${reason}`,
-    );
+    if (!infractee || !punishment || !reason) {
+      return;
+    }
+
+    const embed = createInfractionEmbed({
+      infractee,
+      moderator: ctx.user,
+      punishment,
+      reason,
+    });
 
     if (ctx.channel?.isSendable()) {
       const reply = await ctx.channel.send({ embeds: [embed] });

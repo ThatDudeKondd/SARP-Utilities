@@ -1,10 +1,13 @@
 export const CONSTANTS = {
   DEFAULT_TIMEOUT: 5000,
   MAX_RETRIES: 3,
-  EMBED_COLOR: 0x1e90ff,
-  EMBED_ERROR_COLOR: 0xff0000,
-  EMBED_SUCCESS_COLOR: 0x00ff00,
-  EMBED_WARNING_COLOR: 0xffff00,
+  // Discord's own palette reads far more "native" than pure RGB primaries.
+  EMBED_COLOR: 0x5865f2, // blurple
+  EMBED_ERROR_COLOR: 0xed4245, // red
+  EMBED_SUCCESS_COLOR: 0x57f287, // green
+  EMBED_WARNING_COLOR: 0xfaa61a, // orange (pure yellow is hard to read against dark theme)
+  EMBED_INFRACTION_COLOR: 0xe74c3c, // distinct from error red, reserved for moderation actions
+  EMBED_FOOTER_TEXT: "SARP Utilities",
   MAX_EMBED_FIELDS: 25,
   MAX_FIELD_LENGTH: 1024,
 } as const;
