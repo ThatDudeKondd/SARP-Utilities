@@ -9,7 +9,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "db:migrate": "prisma migrate dev",
-    "db:push": "prisma db push --force-reset",
+    "db:push": "prisma db push --accept-data-loss",
     "db:seed": "node --loader ts-node/esm prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:gen": "npx prisma generate",
