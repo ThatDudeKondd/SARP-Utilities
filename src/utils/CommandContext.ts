@@ -26,7 +26,7 @@ type ResolvedValue = string | number | boolean | User | TextBasedChannel | Role;
  * a single `execute(ctx)` function can handle both without branching.
  */
 export class CommandContext {
-  private readonly message?: Message;
+  public message?: Message;
   private readonly _interaction?: ChatInputCommandInteraction;
   private readonly resolvedArgs = new Map<string, ResolvedValue>();
   private lastReply?: Message;

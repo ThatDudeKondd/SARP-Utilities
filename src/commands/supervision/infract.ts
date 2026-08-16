@@ -30,6 +30,7 @@ export default defineCommand({
 
   execute: async (ctx) => {
     await ctx.defer();
+    await ctx.message?.delete();
 
     const infractee = ctx.getUser("user");
     const punishment = ctx.getString("punishment");
@@ -40,7 +41,7 @@ export default defineCommand({
     });
 
     const embed = createSuccessEmbed(
-      "Infract Command Executed",
+      "User infracted successfully",
       `User: ${infractee?.tag}\nPunishment: ${punishment}\nReason: ${reason}`,
     );
 
