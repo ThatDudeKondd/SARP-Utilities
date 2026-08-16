@@ -1,6 +1,7 @@
 import { prisma } from "../../database/client.js";
 import { defineCommand } from "../../utils/defineCommand.js";
 import { logger } from "../../utils/logger.js";
+import { createSuccessEmbed } from "../../utils/formatters.js";
 
 export default defineCommand({
   name: "infract",
@@ -38,8 +39,13 @@ export default defineCommand({
       where: { userId: infractee?.id },
     });
 
+    const embed = createSuccessEmbed(
+      "Infract Command Executed",
+      `User: ${infractee?.tag}\nPunishment: ${punishment}\nReason: ${reason}`,
+    );
+
     await ctx.editReply({
-      content: `Infracted ${infractee?.username} with punishment: ${punishment} for reason: ${reason}`,
+      embeds: [embed],
     });
 
     logger.info("Infractee Database Data:", infracteeData);
