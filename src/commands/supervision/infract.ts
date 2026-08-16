@@ -2,6 +2,7 @@ import { prisma } from "../../database/client.js";
 import { defineCommand } from "../../utils/defineCommand.js";
 import { logger } from "../../utils/logger.js";
 import { createSuccessEmbed } from "../../utils/formatters.js";
+import { MessageFlags } from "discord.js";
 
 export default defineCommand({
   name: "infract",
@@ -45,9 +46,7 @@ export default defineCommand({
       `User: ${infractee?.tag}\nPunishment: ${punishment}\nReason: ${reason}`,
     );
 
-    await ctx.reply({
-      embeds: [embed],
-    });
+    await ctx.channel?.send({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
     logger.info("Infractee Database Data:", infracteeData);
   },
