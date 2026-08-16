@@ -45,7 +45,7 @@ export default defineCommand({
       `User: ${infractee?.tag}\nPunishment: ${punishment}\nReason: ${reason}`,
     );
 
-    await ctx.editReply({
+    await ctx.reply({
       embeds: [embed],
     });
 
