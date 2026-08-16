@@ -43,6 +43,10 @@ export default defineCommand({
       where: { userId: infractee?.id },
     });
 
+    const guildData = await prisma.guildConfig.findUnique({
+      where: { guildId: ctx.guild?.id },
+    });
+
     if (!infractee || !punishment || !reason) {
       return;
     }
@@ -54,9 +58,17 @@ export default defineCommand({
       reason,
     });
 
+    const infractionChannel = ctx.guild?.channels.cache.get(
+      guildData?.infractionChannel || "",
+    );
+
+    if (infractionChannel?.isTextBased()) {
+      await infractionChannel.send({ embeds: [embed] });
+    }
+
     const successEmbed = createSuccessEmbed(
       "Infraction Issued",
-      `Successfully infracted ${infractee.tag} with the punishment: ${punishment} and reason: ${reason}`,
+      `Successfully infracted user.`,
     );
 
     if (ctx.channel?.isSendable()) {
