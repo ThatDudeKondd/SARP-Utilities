@@ -97,7 +97,8 @@ export function createInfractionEmbed(
       { name: "Punishment", value: punishment, inline: true },
       { name: "Moderator", value: `${moderator}`, inline: true },
       { name: "Reason", value: truncateString(reason) },
-    );
+    )
+    .setFooter({ text: `Signed by ${moderator.username}` });
 }
 
 export function truncateString(

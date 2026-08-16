@@ -29,9 +29,9 @@ export default defineCommand({
     const commandList = commands.map(formatCommand).join("\n");
 
     const helpEmbed = new EmbedBuilder()
-      .setTitle("ERLC Bot Help")
+      .setTitle("SARP Utils Help")
       .setDescription(
-        "Browse every available command for ERLC Bot. Commands can be used through slash commands or the configured prefix.",
+        "Browse every available command for SARP Utils. Commands can be used through slash commands or the configured prefix.",
       )
       .setColor(CONSTANTS.EMBED_COLOR)
       .addFields(
@@ -43,11 +43,11 @@ export default defineCommand({
         {
           name: "Notes",
           value:
-            "Some commands require specific server role permissions. Only supervisors+ or configured ERLC roles can manage server setup and run ERLC actions.",
+            "Some commands require specific server role permissions. Only supervisors+ or configured SARP roles can manage server setup and run SARP actions.",
           inline: false,
         },
       )
-      .setFooter({ text: "ERLC Bot • Use commands for more details" })
+      .setFooter({ text: "SARP Utils • Use commands for more details" })
       .setTimestamp();
 
     await ctx.reply({ embeds: [helpEmbed], flags: MessageFlags.Ephemeral });

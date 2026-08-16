@@ -1,8 +1,10 @@
 import { prisma } from "../../database/client.js";
 import { defineCommand } from "../../utils/defineCommand.js";
 import { logger } from "../../utils/logger.js";
-import { createInfractionEmbed } from "../../utils/formatters.js";
-import { MessageFlags } from "discord.js";
+import {
+  createInfractionEmbed,
+  createSuccessEmbed,
+} from "../../utils/formatters.js";
 
 export default defineCommand({
   name: "infract",
@@ -52,8 +54,13 @@ export default defineCommand({
       reason,
     });
 
+    const successEmbed = createSuccessEmbed(
+      "Infraction Issued",
+      `Successfully infracted ${infractee.tag} with the punishment: ${punishment} and reason: ${reason}`,
+    );
+
     if (ctx.channel?.isSendable()) {
-      const reply = await ctx.channel.send({ embeds: [embed] });
+      const reply = await ctx.channel.send({ embeds: [successEmbed] });
       await new Promise((resolve) => setTimeout(resolve, 2000));
       await reply.delete();
     }
