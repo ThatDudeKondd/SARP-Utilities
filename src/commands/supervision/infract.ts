@@ -46,7 +46,9 @@ export default defineCommand({
       `User: ${infractee?.tag}\nPunishment: ${punishment}\nReason: ${reason}`,
     );
 
-    await ctx.channel?.send({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    if (ctx.channel?.isSendable()) {
+      await ctx.channel.send({ embeds: [embed] });
+    }
 
     logger.info("Infractee Database Data:", infracteeData);
   },
