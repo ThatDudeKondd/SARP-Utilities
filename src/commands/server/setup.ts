@@ -1,5 +1,7 @@
 import {
   ActionRowBuilder,
+  ChannelSelectMenuBuilder,
+  ChannelType,
   ComponentType,
   EmbedBuilder,
   PermissionsBitField,
@@ -10,8 +12,127 @@ import { prisma } from "../../database/client.js";
 import { logger } from "../../utils/logger.js";
 import { CONSTANTS } from "../../config/constants.js";
 import { SubCommand } from "../../types/UnifiedCommand.js";
-import { GuildConfigService } from "../../services/GuildConfigService.js";
-import { title } from "process";
+
+/**
+ * One prompt in the setup wizard. Add a new entry here to add a new step —
+ * nothing else in this file needs to change. `key` must match a field on
+ * the Prisma `GuildConfig` model.
+ */
+type SetupStep =
+  | {
+      type: "role";
+      key: string;
+      title: string;
+      description: string;
+      /** Defaults: min 0, max 25 (i.e. optional, multi-select). */
+      minValues?: number;
+      maxValues?: number;
+    }
+  | {
+      type: "channel";
+      key: string;
+      title: string;
+      description: string;
+      channelTypes?: ChannelType[];
+      /** Whether a channel must be selected to proceed. Default: false. */
+      required?: boolean;
+    };
+
+const SETUP_STEPS: SetupStep[] = [
+  {
+    type: "role",
+    key: "directiveRoles",
+    title: "Directive Roles",
+    description:
+      "Select one or more Directive roles that should have the highest authority in the server.",
+  },
+  {
+    type: "role",
+    key: "seniorHrRoles",
+    title: "Senior Management Roles",
+    description:
+      "Select one or more Senior Management roles that are above Management.",
+  },
+  {
+    type: "role",
+    key: "managementRoles",
+    title: "Management Roles",
+    description:
+      "Select one or more Management roles that are above Internal Affairs.",
+  },
+  {
+    type: "role",
+    key: "supervisorRoles",
+    title: "Supervisor Roles",
+    description:
+      "Select one or more Supervisor roles that can execute /erlc run and higher-level actions.",
+  },
+  {
+    type: "role",
+    key: "administratorRoles",
+    title: "Admin Roles",
+    description:
+      "Select one or more roles that should be treated as server administration roles.",
+  },
+  {
+    type: "role",
+    key: "moderatorRoles",
+    title: "Moderator Roles",
+    description:
+      "Select one or more roles that should be able to use moderator tools and /erlc players.",
+  },
+  {
+    type: "channel",
+    key: "infractionChannel",
+    title: "Infraction Channel",
+    description:
+      "Select a channel to set as the infraction channel that will be used for sending infractions.",
+    channelTypes: [ChannelType.GuildText],
+    required: true,
+  },
+];
+
+/** Formats a step's current selection for display in an embed field. */
+function formatSelection(step: SetupStep, values: string[]): string {
+  if (values.length === 0) return "None selected";
+
+  return step.type === "channel"
+    ? `<#${values[0]}>`
+    : values.map((id) => `<@&${id}>`).join(", ");
+}
+
+/** Builds the select menu + action row for a single step. */
+function buildStepComponents(step: SetupStep) {
+  const customId = `setup_select_${step.key}`;
+
+  if (step.type === "channel") {
+    const menu = new ChannelSelectMenuBuilder()
+      .setCustomId(customId)
+      .setPlaceholder(`Select ${step.title}`)
+      .setMinValues(step.required ? 1 : 0)
+      .setMaxValues(1);
+
+    if (step.channelTypes) menu.setChannelTypes(step.channelTypes);
+
+    return {
+      row: new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(menu),
+      componentType: ComponentType.ChannelSelect as const,
+      customId,
+    };
+  }
+
+  const menu = new RoleSelectMenuBuilder()
+    .setCustomId(customId)
+    .setPlaceholder(`Select ${step.title}`)
+    .setMinValues(step.minValues ?? 0)
+    .setMaxValues(step.maxValues ?? 25);
+
+  return {
+    row: new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(menu),
+    componentType: ComponentType.RoleSelect as const,
+    customId,
+  };
+}
 
 export default {
   name: "setup",
@@ -24,11 +145,6 @@ export default {
 
       await ctx.defer();
 
-      console.log({
-        replied: ctx.interaction?.replied,
-        deferred: ctx.interaction?.deferred,
-      });
-
       const isSuperAdmin = ctx.user.id === config.superAdminId;
       const isAdmin = ctx.member?.permissions?.has(
         PermissionsBitField.Flags.Administrator,
@@ -39,126 +155,64 @@ export default {
         );
       }
 
-      const guildConfig = GuildConfigService.getConfig(ctx.guild.id);
-
       const introEmbed = new EmbedBuilder()
         .setTitle("Server Setup")
         .setDescription(
-          "We will now configure role-based access for ERLC commands. For each prompt, select one or more roles or submit without selecting any roles if none apply.",
+          "We will now configure role-based access for ERLC commands. For each prompt, select one or more roles (or a channel, where asked) — submit without selecting anything if a step is optional and doesn't apply.",
         )
         .setColor(CONSTANTS.EMBED_COLOR)
         .setTimestamp();
-      await ctx.editReply({
-        embeds: [introEmbed],
-        components: [],
-      });
+      await ctx.editReply({ embeds: [introEmbed], components: [] });
 
-      const selectedRoles: Record<string, string[]> = {};
-      const categories = [
-        {
-          key: "directiveRoles",
-          title: "Directive Roles",
-          description:
-            "Select one or more Directive roles that should have the highest authority in the server.",
-        },
-        {
-          key: "seniorHrRoles",
-          title: "Senior Management Roles",
-          description:
-            "Select one or more Senior Management roles that are above Management.",
-        },
-        {
-          key: "managementRoles",
-          title: "Management Roles",
-          description:
-            "Select one or more Management roles that are above Internal Affairs.",
-        },
-        {
-          key: "supervisorRoles",
-          title: "Supervisor Roles",
-          description:
-            "Select one or more Supervisor roles that can execute /erlc run and higher-level actions.",
-        },
-        {
-          key: "administratorRoles",
-          title: "Admin Roles",
-          description:
-            "Select one or more roles that should be treated as server administration roles.",
-        },
-        {
-          key: "moderatorRoles",
-          title: "Moderator Roles",
-          description:
-            "Select one or more roles that should be able to use moderator tools and /erlc players.",
-        },
-        {
-          key: "infractionChannel",
-          title: "Infraction Channel",
-          description: "Select a channel to set as the infraction channel that will be used for sending infractions."
-        }
-      ];
+      // Every step's selection, always stored as an array — a channel step
+      // just has at most one entry — so downstream logic doesn't need to
+      // branch on step type.
+      const selectedValues: Record<string, string[]> = {};
 
-      let savedConfig: Awaited<
-        ReturnType<typeof prisma.guildConfig.findUnique>
-      > = null;
+      for (const step of SETUP_STEPS) {
+        const { row, componentType, customId } = buildStepComponents(step);
 
-      for (const category of categories) {
-        const rows = [];
-        const selectMenu = new RoleSelectMenuBuilder()
-          .setCustomId(`setup_select_${category.key}`)
-          .setPlaceholder(`Select ${category.title}`)
-          .setMinValues(0)
-          .setMaxValues(25);
-
-        rows.push(
-          new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(
-            selectMenu,
-          ),
-        );
         const stepEmbed = new EmbedBuilder()
-          .setTitle(`Configure ${category.title}`)
-          .setDescription(category.description)
+          .setTitle(`Configure ${step.title}`)
+          .setDescription(step.description)
           .addFields(
             {
               name: "Instructions",
               value:
-                "Choose one or more roles from the menu below. If you do not want to assign any roles for this category, submit without selecting any.",
+                step.type === "channel" && step.required
+                  ? "Choose a channel from the menu below."
+                  : "Choose one or more from the menu below. If none apply, submit without selecting any.",
             },
             { name: "Current selection", value: "None selected" },
           )
           .setColor(CONSTANTS.EMBED_COLOR)
           .setTimestamp();
-        await ctx.editReply({
-          embeds: [stepEmbed],
-          components: rows,
-        });
+
+        await ctx.editReply({ embeds: [stepEmbed], components: [row] });
         const stepMessage = await ctx.fetchReply();
 
         const collectorFilter = (i: any) =>
-          i.user.id === ctx.user.id &&
-          i.customId === `setup_select_${category.key}`;
+          i.user.id === ctx.user.id && i.customId === customId;
 
         try {
           const selection = await stepMessage?.awaitMessageComponent({
             filter: collectorFilter,
-            componentType: ComponentType.RoleSelect,
+            componentType,
             time: 60000,
           });
-          selectedRoles[category.key] = Array.isArray(selection?.values)
-            ? selection?.values
+
+          selectedValues[step.key] = Array.isArray(selection?.values)
+            ? selection.values
             : [];
 
           const selectedEmbed = new EmbedBuilder()
-            .setTitle(`Configure ${category.title}`)
+            .setTitle(`Configure ${step.title}`)
             .setDescription(
-              `${category.description}\n\n**Selected roles:** ${selectedRoles[category.key].length > 0 ? selectedRoles[category.key].map((id) => `<@&${id}>`).join(", ") : "None selected"}`,
+              `${step.description}\n\n**Selected:** ${formatSelection(step, selectedValues[step.key])}`,
             )
             .setColor(CONSTANTS.EMBED_COLOR)
             .setTimestamp();
-          await ctx.editReply({
-            embeds: [selectedEmbed],
-            components: [],
-          });
+          await ctx.editReply({ embeds: [selectedEmbed], components: [] });
         } catch (err: any) {
           if (err?.code === "InteractionCollectorError") {
             await ctx.editReply({
@@ -175,33 +229,31 @@ export default {
             return;
           }
 
-          logger.error("Setup error:", err);
-
-          await ctx.editReply({
-            content: "❌ An unexpected error occurred during setup.",
-            embeds: [],
-            components: [],
-          });
+          throw err;
         }
-
-        savedConfig = await prisma.guildConfig.upsert({
-          where: { guildId: ctx.guild.id },
-          update: {
-            [category.key]: selectedRoles[category.key],
-            infractionChannel: 
-          },
-          create: {
-            guildId: ctx.guild.id,
-            [category.key]: selectedRoles[category.key],
-            infractionChannel: 
-          },
-        });
       }
+
+      // Build the Prisma payload generically from whatever steps ran, rather
+      // than listing each field by hand — new steps need no changes here.
+      const configData: Record<string, string | string[]> = {};
+      for (const step of SETUP_STEPS) {
+        const values = selectedValues[step.key] ?? [];
+        configData[step.key] =
+          step.type === "channel" ? (values[0] ?? "") : values;
+      }
+
+      const savedConfig = await prisma.guildConfig.upsert({
+        where: { guildId: ctx.guild.id },
+        update: configData,
+        create: { guildId: ctx.guild.id, ...configData },
+      });
 
       if (!savedConfig) {
         throw new Error("Failed to save guild configuration.");
       }
 
+      // Same generic pattern for the summary — one field per step, in the
+      // order steps are defined, with no per-field hardcoding.
       const completedEmbed = new EmbedBuilder()
         .setTitle("Server Setup Complete")
         .setDescription(
@@ -210,59 +262,13 @@ export default {
         .setColor(CONSTANTS.EMBED_SUCCESS_COLOR)
         .setTimestamp()
         .addFields(
-          {
-            name: "Directive Roles",
-            value:
-              savedConfig.directiveRoles.length > 0
-                ? savedConfig.directiveRoles.map((id) => `<@&${id}>`).join(", ")
-                : "None selected",
-          },
-          {
-            name: "Senior Management Roles",
-            value:
-              savedConfig.seniorHrRoles.length > 0
-                ? savedConfig.seniorHrRoles.map((id) => `<@&${id}>`).join(", ")
-                : "None selected",
-          },
-          {
-            name: "Management Roles",
-            value:
-              savedConfig.managementRoles.length > 0
-                ? savedConfig.managementRoles
-                    .map((id) => `<@&${id}>`)
-                    .join(", ")
-                : "None selected",
-          },
-          {
-            name: "Supervisor Roles",
-            value:
-              savedConfig.supervisorRoles.length > 0
-                ? savedConfig.supervisorRoles
-                    .map((id) => `<@&${id}>`)
-                    .join(", ")
-                : "None selected",
-          },
-          {
-            name: "Admin Roles",
-            value:
-              savedConfig.administratorRoles.length > 0
-                ? savedConfig.administratorRoles
-                    .map((id) => `<@&${id}>`)
-                    .join(", ")
-                : "None selected",
-          },
-          {
-            name: "Moderator Roles",
-            value:
-              savedConfig.moderatorRoles.length > 0
-                ? savedConfig.moderatorRoles.map((id) => `<@&${id}>`).join(", ")
-                : "None selected",
-          },
+          SETUP_STEPS.map((step) => ({
+            name: step.title,
+            value: formatSelection(step, selectedValues[step.key] ?? []),
+          })),
         );
-      await ctx.editReply({
-        embeds: [completedEmbed],
-        components: [],
-      });
+
+      await ctx.editReply({ embeds: [completedEmbed], components: [] });
     } catch (e) {
       logger.error("Setup command failed:", e);
       await ctx

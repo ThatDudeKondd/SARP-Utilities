@@ -33,7 +33,7 @@ let slashData: SlashCommandBuilder[] = [];
 
 const jsk = new Jishaku(client, {
   prefix: "-", // Root command becomes `.jsk`. Default: '.'
-  owners: ["726507399640252416", "1383717448804470817", "1355621905658548357"], // Optional; defaults to the application owner/team.
+  owners: ["726507399640252416", "1383717448804470817", "1355621905658548357","1092489655888379915"], // Optional; defaults to the application owner/team.
   encoding: "UTF-8", // Use 'Shift_JIS' for Japanese Windows shell output.
 });
 
