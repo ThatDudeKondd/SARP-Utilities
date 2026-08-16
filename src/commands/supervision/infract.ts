@@ -37,6 +37,11 @@ export default defineCommand({
     const infracteeData = await prisma.user.findUnique({
       where: { userId: infractee?.id },
     });
+
+    await ctx.editReply({
+      content: `Infracted ${infractee?.username} with punishment: ${punishment} for reason: ${reason}`,
+    });
+
     logger.info("Infractee Database Data:", infracteeData);
   },
 });
