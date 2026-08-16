@@ -51,16 +51,6 @@ export default defineCommand({
       return;
     }
 
-    await prisma.user.upsert({
-      where: { userId: infractee.id },
-      update: {},
-      create: {
-        userId: infractee.id,
-        username: infractee.username,
-        guilds: ctx.guild?.id ? [ctx.guild.id] : [],
-      },
-    });
-
     const infractionRecord = await prisma.infraction.create({
       data: {
         guildId: ctx.guild?.id ?? "",
@@ -68,6 +58,15 @@ export default defineCommand({
         moderatorId: ctx.user.id,
         punishment,
         reason,
+      },
+    });
+
+    await prisma.user.update({
+      where: { userId: infractee.id },
+      data: {
+        infractions: {
+          connect: { caseNumber: infractionRecord.caseNumber },
+        },
       },
     });
 
