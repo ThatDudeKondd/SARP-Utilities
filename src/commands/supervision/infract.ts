@@ -51,11 +51,32 @@ export default defineCommand({
       return;
     }
 
+    await prisma.user.upsert({
+      where: { userId: infractee.id },
+      update: {},
+      create: {
+        userId: infractee.id,
+        username: infractee.username,
+        guilds: ctx.guild?.id ? [ctx.guild.id] : [],
+      },
+    });
+
+    const infractionRecord = await prisma.infraction.create({
+      data: {
+        guildId: ctx.guild?.id ?? "",
+        userId: infractee.id,
+        moderatorId: ctx.user.id,
+        punishment,
+        reason,
+      },
+    });
+
     const embed = createInfractionEmbed({
       infractee,
       moderator: ctx.user,
       punishment,
       reason,
+      caseNumber: infractionRecord.caseNumber,
     });
 
     const infractionChannel = ctx.guild?.channels.cache.get(

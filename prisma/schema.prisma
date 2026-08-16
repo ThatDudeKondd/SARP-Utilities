@@ -47,16 +47,34 @@ model CommandCooldown {
   @@map("command_cooldowns")
 }
 
+// Structured infraction records, one row per punishment issued via /infract
+model Infraction {
+  id          String   @id @default(cuid())
+  caseNumber  Int      @unique @default(autoincrement())
+  guildId     String
+  userId      String
+  moderatorId String
+  punishment  String
+  reason      String
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [userId])
+
+  @@index([userId])
+  @@index([guildId])
+  @@map("infractions")
+}
+
 // User data (optional, for infractions/warnings)
 model User {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  username    String   @unique
-  roles       String[] @default([])
-  guilds      String[] @default([])
-  infractions String[] @default([])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          String       @id @default(cuid())
+  userId      String       @unique
+  username    String       @unique
+  roles       String[]     @default([])
+  guilds      String[]     @default([])
+  infractions Infraction[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@map("users")
 }
