@@ -1,10 +1,8 @@
 import { EmbedBuilder } from "discord.js";
-import { prisma } from "../../database/client.js";
 import { defineCommand } from "../../utils/defineCommand.js";
-import { logger } from "../../utils/logger.js";
 import { CONSTANTS } from "../../config/constants.js";
+import { syncGuildMembers } from "../../services/SyncService.js";
 
-/** Update the progress embed every N members, so we don't hammer Discord's rate limits on large guilds. */
 const UPDATE_INTERVAL = 10;
 
 export default defineCommand({
@@ -17,14 +15,7 @@ export default defineCommand({
     const guild = ctx.guild;
     if (!guild) return;
 
-    const members = await guild.members.fetch(); // full fetch, not cache
-    const humanMembers = [...members.values()].filter((m) => !m.user.bot);
-    const total = humanMembers.length;
-
-    let synced = 0;
-    let failed = 0;
-
-    const progressEmbed = () =>
+    const progressEmbed = (synced: number, failed: number, total: number) =>
       new EmbedBuilder()
         .setTitle("🔄 Syncing members...")
         .setDescription(
@@ -33,36 +24,21 @@ export default defineCommand({
         .setColor(CONSTANTS.EMBED_COLOR)
         .setTimestamp();
 
-    await ctx.reply({ embeds: [progressEmbed()] });
+    await ctx.reply({ embeds: [progressEmbed(0, 0, 0)] });
 
-    for (const member of humanMembers) {
-      try {
-        const roleIds = member.roles.cache
-          .filter((role) => role.id !== guild.id) // drop @everyone
-          .map((role) => role.id);
-
-        await prisma.user.upsert({
-          where: { userId: member.id },
-          update: { roles: roleIds, username: member.user.username },
-          create: {
-            userId: member.id,
-            roles: roleIds,
-            username: member.user.username,
-            guilds: [guild.id],
-          },
-        });
-
-        synced++;
-      } catch (error) {
-        failed++;
-        logger.error(`Failed to sync member ${member.id}:`, error);
-      }
-
-      const processed = synced + failed;
-      if (processed % UPDATE_INTERVAL === 0 || processed === total) {
-        await ctx.editReply({ embeds: [progressEmbed()] });
-      }
-    }
+    let lastUpdate = 0;
+    const { synced, failed, total } = await syncGuildMembers(
+      guild,
+      async ({ synced, failed, total }) => {
+        const processed = synced + failed;
+        if (processed - lastUpdate >= UPDATE_INTERVAL || processed === total) {
+          lastUpdate = processed;
+          await ctx.editReply({
+            embeds: [progressEmbed(synced, failed, total)],
+          });
+        }
+      },
+    );
 
     const resultEmbed =
       failed === 0
