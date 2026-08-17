@@ -11,7 +11,7 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push --accept-data-loss",
     "db:seed": "node --loader ts-node/esm prisma/seed.ts",
-    "db:studio": "HOSTNAME=0.0.0.0 BROWSER=none prisma studio",
+    "db:studio": "BROWSER=none prisma studio",
     "db:gen": "npx prisma generate",
     "db:format": "npx prisma format",
     "db:update": "npm run db:format && npm run db:push && npm run db:gen"
