@@ -1,5 +1,6 @@
 import { prisma } from "../database/client.js";
 import { logger } from "../utils/logger.js";
+import type { Prisma } from "../generated/prisma/client.js";
 
 export class GuildConfigService {
   /**
@@ -27,19 +28,46 @@ export class GuildConfigService {
 
   /**
    * Update guild config
+   *
+   * `data` is intentionally loosely typed (Record of string | string[])
+   * because callers like setup.ts and configuration.ts build this object
+   * dynamically -- a channel step produces a string, a role step produces
+   * a string[], and neither knows the others' exact field names at compile
+   * time. Prisma's own generated types are much more precise per field
+   * (e.g. `prefix` must be exactly `string`, `directiveRoles` must be
+   * exactly `string[]`), which TypeScript can't reconcile against a single
+   * blanket union type. The cast below is safe because every real caller
+   * (getPrefix/setPrefix/setModLogChannel, and the generic callers in
+   * setup.ts/configuration.ts) already puts the correct value shape on
+   * the correct key -- there's no path that actually sends a string[]
+   * where Prisma expects a string, or vice versa.
    */
   static async updateConfig(
     guildId: string,
-    data: {
-      prefix?: string;
-      modLogChannelId?: string;
-    },
+    data: Partial<
+      Record<
+        | "prefix"
+        | "modLogChannelId"
+        | "infractionChannel"
+        | "logsChannel"
+        | "directiveRoles"
+        | "seniorHrRoles"
+        | "managementRoles"
+        | "supervisorRoles"
+        | "administratorRoles"
+        | "moderatorRoles",
+        string | string[]
+      >
+    >,
   ) {
     try {
       const config = await prisma.guildConfig.upsert({
         where: { guildId },
-        update: data,
-        create: { guildId, ...data },
+        update: data as Prisma.GuildConfigUpdateInput,
+        create: {
+          guildId,
+          ...data,
+        } as Prisma.GuildConfigCreateInput,
       });
 
       logger.info(`Updated guild config for ${guildId}`);

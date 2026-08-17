@@ -6,6 +6,8 @@ import {
   ComponentType,
   MessageFlags,
   RoleSelectMenuBuilder,
+  ChannelSelectMenuBuilder,
+  ChannelType,
   ButtonInteraction,
 } from "discord.js";
 import { CONSTANTS } from "../../config/constants.js";
@@ -24,47 +26,82 @@ type RoleCategoryKey =
   | "administratorRoles"
   | "moderatorRoles";
 
-const ROLE_CATEGORIES: {
-  key: RoleCategoryKey;
-  title: string;
-  description: string;
-}[] = [
+type ChannelCategoryKey = "infractionChannel" | "logsChannel";
+
+type ConfigCategoryKey = RoleCategoryKey | ChannelCategoryKey;
+
+type ConfigCategory =
+  | {
+      type: "role";
+      key: RoleCategoryKey;
+      title: string;
+      description: string;
+    }
+  | {
+      type: "channel";
+      key: ChannelCategoryKey;
+      title: string;
+      description: string;
+      channelTypes?: ChannelType[];
+    };
+
+const CONFIG_CATEGORIES: ConfigCategory[] = [
   {
+    type: "role",
     key: "directiveRoles",
     title: "Directive Roles",
     description: "Highest authority in the server.",
   },
   {
+    type: "role",
     key: "seniorHrRoles",
     title: "Senior Management Roles",
     description: "Above Management level.",
   },
   {
+    type: "role",
     key: "managementRoles",
     title: "Management Roles",
     description: "Above Internal Affairs level.",
   },
   {
+    type: "role",
     key: "supervisorRoles",
     title: "Internal Affairs Roles",
     description: "Can execute /erlc run and higher-level actions.",
   },
   {
+    type: "role",
     key: "administratorRoles",
     title: "Admin Roles",
     description: "Treated as server administration roles.",
   },
   {
+    type: "role",
     key: "moderatorRoles",
     title: "Moderator Roles",
     description: "Can use moderator tools and /erlc players.",
+  },
+  {
+    type: "channel",
+    key: "infractionChannel",
+    title: "Infraction Channel",
+    description: "Channel used for sending infraction logs.",
+    channelTypes: [ChannelType.GuildText],
+  },
+  {
+    type: "channel",
+    key: "logsChannel",
+    title: "Logs Channel",
+    description: "Channel used for general server activity and audit logs.",
+    channelTypes: [ChannelType.GuildText],
   },
 ];
 
 function createConfigEmbed(guildConfig: GuildConfig | null) {
   const embed = new EmbedBuilder()
     .setTitle("Server Configuration")
-    .setDescription("Current role-based access configuration for this server")
+    .setDescription("Current configuration for this server")
     .setColor(CONSTANTS.EMBED_COLOR)
     .setTimestamp();
 
@@ -77,22 +114,27 @@ function createConfigEmbed(guildConfig: GuildConfig | null) {
     return embed;
   }
 
-  for (const category of ROLE_CATEGORIES) {
-    const roles = guildConfig[category.key];
+  for (const category of CONFIG_CATEGORIES) {
+    if (category.type === "role") {
+      const roles = guildConfig[category.key];
+      const rolesDisplay =
+        Array.isArray(roles) && roles.length > 0
+          ? roles.map((id) => `<@&${id}>`).join(", ")
+          : "No roles assigned";
 
-    // Only process String[] fields
-    if (!Array.isArray(roles)) continue;
-
-    const rolesDisplay =
-      roles.length > 0
-        ? roles.map((id) => `<@&${id}>`).join(", ")
-        : "No roles assigned";
-
-    embed.addFields({
-      name: category.title,
-      value: rolesDisplay,
-      inline: false,
-    });
+      embed.addFields({
+        name: category.title,
+        value: rolesDisplay,
+        inline: false,
+      });
+    } else {
+      const channelId = guildConfig[category.key];
+      embed.addFields({
+        name: category.title,
+        value: channelId ? `<#${channelId}>` : "Not set",
+        inline: false,
+      });
+    }
   }
 
   return embed;
@@ -103,7 +145,7 @@ function createEditButtons() {
   let currentRow = new ActionRowBuilder<ButtonBuilder>();
   let buttonCount = 0;
 
-  for (const category of ROLE_CATEGORIES) {
+  for (const category of CONFIG_CATEGORIES) {
     if (buttonCount === 5) {
       rows.push(currentRow);
       currentRow = new ActionRowBuilder<ButtonBuilder>();
@@ -189,9 +231,11 @@ export default {
             const categoryKey = buttonInteraction.customId.replace(
               "config_edit_",
               "",
-            ) as RoleCategoryKey;
+            ) as ConfigCategoryKey;
 
-            const category = ROLE_CATEGORIES.find((c) => c.key === categoryKey);
+            const category = CONFIG_CATEGORIES.find(
+              (c) => c.key === categoryKey,
+            );
 
             if (!category) {
               await buttonInteraction.reply({
@@ -201,6 +245,8 @@ export default {
               return;
             }
 
+            const isChannel = category.type === "channel";
+
             await buttonInteraction.reply({
               embeds: [
                 new EmbedBuilder()
@@ -208,20 +254,36 @@ export default {
                   .setDescription(category.description)
                   .addFields({
                     name: "Instructions",
-                    value:
-                      "Choose one or more roles from the menu below. Submit without selecting roles to clear this category.",
+                    value: isChannel
+                      ? "Choose a channel from the menu below. Submit without selecting to clear it."
+                      : "Choose one or more roles from the menu below. Submit without selecting roles to clear this category.",
                   })
                   .setColor(CONSTANTS.EMBED_COLOR)
                   .setTimestamp(),
               ],
               components: [
-                new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(
-                  new RoleSelectMenuBuilder()
-                    .setCustomId(`config_select_${categoryKey}`)
-                    .setPlaceholder(`Select roles for ${category.title}`)
-                    .setMinValues(0)
-                    .setMaxValues(25),
-                ),
+                isChannel
+                  ? new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+                      new ChannelSelectMenuBuilder()
+                        .setCustomId(`config_select_${categoryKey}`)
+                        .setPlaceholder(
+                          `Select a channel for ${category.title}`,
+                        )
+                        .setChannelTypes(
+                          category.type === "channel" && category.channelTypes
+                            ? category.channelTypes
+                            : [ChannelType.GuildText],
+                        )
+                        .setMinValues(0)
+                        .setMaxValues(1),
+                    )
+                  : new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(
+                      new RoleSelectMenuBuilder()
+                        .setCustomId(`config_select_${categoryKey}`)
+                        .setPlaceholder(`Select roles for ${category.title}`)
+                        .setMinValues(0)
+                        .setMaxValues(25),
+                    ),
               ],
               flags: MessageFlags.Ephemeral,
             });
@@ -231,28 +293,40 @@ export default {
             try {
               const selectInteraction =
                 await selectMessage.awaitMessageComponent({
-                  componentType: ComponentType.RoleSelect,
+                  componentType: isChannel
+                    ? ComponentType.ChannelSelect
+                    : ComponentType.RoleSelect,
                   time: 60000,
                   filter: (i) => i.user.id === ctx.user.id,
                 });
 
-              guildConfig[categoryKey] = selectInteraction.values;
+              const newValue: string | string[] = isChannel
+                ? (selectInteraction.values[0] ?? "")
+                : selectInteraction.values;
+
+              (guildConfig as unknown as Record<string, string | string[]>)[
+                categoryKey
+              ] = newValue;
 
               await GuildConfigService.updateConfig(guildId, {
-                [categoryKey]: selectInteraction.values,
+                [categoryKey]: newValue,
               });
+
+              const updatedDescription = isChannel
+                ? newValue
+                  ? `Now set to: <#${newValue}>`
+                  : "Cleared — no channel set"
+                : (newValue as string[]).length > 0
+                  ? `Now set to: ${(newValue as string[])
+                      .map((id) => `<@&${id}>`)
+                      .join(", ")}`
+                  : "No roles assigned";
 
               await selectInteraction.update({
                 embeds: [
                   new EmbedBuilder()
                     .setTitle(`${category.title} Updated`)
-                    .setDescription(
-                      selectInteraction.values.length > 0
-                        ? `Now set to: ${selectInteraction.values
-                            .map((id) => `<@&${id}>`)
-                            .join(", ")}`
-                        : "No roles assigned",
-                    )
+                    .setDescription(updatedDescription)
                     .setColor(CONSTANTS.EMBED_COLOR)
                     .setTimestamp(),
                 ],
@@ -275,9 +349,7 @@ export default {
                 embeds: [
                   new EmbedBuilder()
                     .setTitle("Selection Timed Out")
-                    .setDescription(
-                      "No role selection was made within 60 seconds.",
-                    )
+                    .setDescription("No selection was made within 60 seconds.")
                     .setColor(CONSTANTS.EMBED_WARNING_COLOR),
                 ],
                 components: [],

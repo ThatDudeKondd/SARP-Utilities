@@ -90,6 +90,15 @@ const SETUP_STEPS: SetupStep[] = [
     channelTypes: [ChannelType.GuildText],
     required: true,
   },
+  {
+    type: "channel",
+    key: "logsChannel",
+    title: "Logs Channel",
+    description:
+      "Select a channel to set as the general logs channel, used for server activity and audit logging.",
+    channelTypes: [ChannelType.GuildText],
+    required: true,
+  },
 ];
 
 /** Formats a step's current selection for display in an embed field. */
