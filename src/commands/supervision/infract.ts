@@ -75,7 +75,7 @@ export default defineCommand({
 
     if (infractionChannel?.isTextBased()) {
       await infractionChannel.send({
-        content: `${infractee}`,
+        content: `<@${infractee.id}>`,
         embeds: [embed],
       });
     }
