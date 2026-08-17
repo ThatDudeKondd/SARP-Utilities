@@ -74,7 +74,10 @@ export default defineCommand({
     );
 
     if (infractionChannel?.isTextBased()) {
-      await infractionChannel.send({ embeds: [embed] });
+      await infractionChannel.send({
+        content: `${infractee}`,
+        embeds: [embed],
+      });
     }
 
     const successEmbed = createSuccessEmbed(
