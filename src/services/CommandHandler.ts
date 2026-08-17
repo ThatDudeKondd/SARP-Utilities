@@ -1,8 +1,9 @@
 import { Message, ChatInputCommandInteraction, MessageFlags } from "discord.js";
 import { logger } from "../utils/logger.js";
 import { checkCommandCooldown } from "../middleware/cooldown.js";
+import { logCommandExecution } from "../middleware/commandLogger.js";
 import { GuildConfigService } from "./GuildConfigService.js";
-import { UnifiedCommand } from "../types/UnifiedCommand.js";
+import { UnifiedCommand, SubCommand } from "../types/UnifiedCommand.js";
 import { CommandContext } from "../utils/CommandContext.js";
 import { CONSTANTS } from "../config/constants.js";
 import { prisma } from "../database/client.js";
@@ -62,19 +63,12 @@ export class CommandHandler {
       if (subcommand) {
         const ctx = new CommandContext(message, subcommand.options, args);
 
-        try {
-          logger.info(
-            `⚡ Executing subcommand: ${prefix}${command.name} ${subcommand.name} by ${message.author.tag}`,
-          );
-
-          await subcommand.execute(ctx);
-        } catch (error) {
-          logger.error(`Error executing subcommand ${subcommand.name}:`, error);
-
-          await ctx.reply({
-            content: "❌ An error occurred while executing this command.",
-          });
-        }
+        await this.executeCommand(
+          ctx,
+          subcommand,
+          `${prefix}${command.name} ${subcommand.name}`,
+          message.author.tag,
+        );
 
         return;
       }
@@ -131,14 +125,24 @@ export class CommandHandler {
 
       const ctx = new CommandContext(interaction, subcommand.options);
 
-      await subcommand.execute(ctx);
+      await this.executeCommand(
+        ctx,
+        subcommand,
+        `/${command.name} ${subcommand.name}`,
+        interaction.user.tag,
+      );
 
       return;
     }
 
     const ctx = new CommandContext(interaction);
 
-    await command.execute?.(ctx);
+    await this.executeCommand(
+      ctx,
+      command,
+      `/${command.name}`,
+      interaction.user.tag,
+    );
   }
 
   /**
@@ -192,16 +196,22 @@ export class CommandHandler {
   }
 
   /**
-   * Unified command execution — logging + error handling for both invocation types.
+   * Unified command execution -- logging (console + guild logs channel) and
+   * error handling, shared by every entry point: top-level and subcommand,
+   * prefix and slash alike. This is the single choke point every command
+   * execution passes through, which is what makes logCommandExecution a
+   * complete audit trail rather than something that has to be remembered
+   * per command.
    */
   private static async executeCommand(
     ctx: CommandContext,
-    command: UnifiedCommand,
+    command: UnifiedCommand | SubCommand,
     commandDisplay: string,
     userTag: string,
   ): Promise<void> {
     try {
       logger.info(`⚡ Executing command: ${commandDisplay} by ${userTag}`);
+      await logCommandExecution(ctx, commandDisplay);
       await command.execute?.(ctx);
     } catch (error) {
       logger.error(`Error executing command ${command.name}:`, error);
