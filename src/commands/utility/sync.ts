@@ -2,6 +2,7 @@ import { EmbedBuilder } from "discord.js";
 import { defineCommand } from "../../utils/defineCommand.js";
 import { CONSTANTS } from "../../config/constants.js";
 import { syncGuildMembers } from "../../services/SyncService.js";
+import { sendToLogsChannel } from "../../utils/logChannel.js";
 
 const UPDATE_INTERVAL = 10;
 
@@ -59,6 +60,9 @@ export default defineCommand({
             .setColor(CONSTANTS.EMBED_ERROR_COLOR)
             .setTimestamp();
 
+    resultEmbed.setFooter({ text: `Triggered by ${ctx.user.tag}` });
+
     await ctx.editReply({ embeds: [resultEmbed] });
+    await sendToLogsChannel(guild, resultEmbed);
   },
 });
