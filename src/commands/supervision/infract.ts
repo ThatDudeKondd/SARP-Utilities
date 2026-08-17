@@ -61,15 +61,6 @@ export default defineCommand({
       },
     });
 
-    await prisma.user.update({
-      where: { userId: infractee.id },
-      data: {
-        infractions: {
-          connect: { caseNumber: infractionRecord.caseNumber },
-        },
-      },
-    });
-
     const embed = createInfractionEmbed({
       infractee,
       moderator: ctx.user,
