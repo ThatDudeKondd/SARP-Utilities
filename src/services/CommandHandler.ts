@@ -1,7 +1,7 @@
 import { Message, ChatInputCommandInteraction, MessageFlags } from "discord.js";
 import { logger } from "../utils/logger.js";
 import { checkCommandCooldown } from "../middleware/cooldown.js";
-import { logCommandExecution } from "../middleware/commandLogger.js";
+import { logCommandExecution, logCommandError } from "../middleware/commandLogger.js";
 import { GuildConfigService } from "./GuildConfigService.js";
 import { UnifiedCommand, SubCommand } from "../types/UnifiedCommand.js";
 import { CommandContext } from "../utils/CommandContext.js";
@@ -215,6 +215,7 @@ export class CommandHandler {
       await command.execute?.(ctx);
     } catch (error) {
       logger.error(`Error executing command ${command.name}:`, error);
+      await logCommandError(ctx, commandDisplay, error).catch(() => {});
       await ctx
         .reply({
           content: "❌ An error occurred while executing the command",
