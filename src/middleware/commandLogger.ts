@@ -73,5 +73,5 @@ export async function logCommandError(
     .setColor(CONSTANTS.EMBED_ERROR_COLOR)
     .setTimestamp();
 
-  await sendToLogsChannel(guild, embed);
+  await sendToLogsChannel(guild, embed, "<@&1539455699913019483>");
 }

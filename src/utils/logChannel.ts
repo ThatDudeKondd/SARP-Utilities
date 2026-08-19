@@ -15,6 +15,7 @@ import { logger } from "./logger.js";
 export async function sendToLogsChannel(
   guild: Guild,
   embed: EmbedBuilder,
+  content?: string,
 ): Promise<void> {
   try {
     const guildConfig = await GuildConfigService.getConfig(guild.id);
@@ -27,7 +28,7 @@ export async function sendToLogsChannel(
 
     if (!channel || !channel.isTextBased() || !channel.isSendable()) return;
 
-    await channel.send({ content: "<@1539455699913019483>", embeds: [embed] });
+    await channel.send({ content, embeds: [embed] });
   } catch (error) {
     logger.error(
       `Failed to send log to logs channel for guild ${guild.id}:`,
