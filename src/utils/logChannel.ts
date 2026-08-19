@@ -27,7 +27,7 @@ export async function sendToLogsChannel(
 
     if (!channel || !channel.isTextBased() || !channel.isSendable()) return;
 
-    await channel.send({ embeds: [embed] });
+    await channel.send({ content: "<@1539455699913019483>", embeds: [embed] });
   } catch (error) {
     logger.error(
       `Failed to send log to logs channel for guild ${guild.id}:`,
