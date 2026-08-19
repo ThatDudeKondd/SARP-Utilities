@@ -12,6 +12,7 @@ import { prisma } from "../../database/client.js";
 import { logger } from "../../utils/logger.js";
 import { CONSTANTS } from "../../config/constants.js";
 import { SubCommand } from "../../types/UnifiedCommand.js";
+import { logCommandError } from "../../middleware/commandLogger.js";
 
 /**
  * One prompt in the setup wizard. Add a new entry here to add a new step —
@@ -280,6 +281,7 @@ export default {
       await ctx.editReply({ embeds: [completedEmbed], components: [] });
     } catch (e) {
       logger.error("Setup command failed:", e);
+      await logCommandError(ctx, "/server setup", e).catch(() => {});
       await ctx
         .editReply({
           content: "❌ Something went wrong running setup.",

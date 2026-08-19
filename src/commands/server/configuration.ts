@@ -1,423 +1,294 @@
 import {
-  EmbedBuilder,
   ActionRowBuilder,
-  ButtonBuilder,
-  PermissionsBitField,
-  ComponentType,
-  MessageFlags,
-  RoleSelectMenuBuilder,
   ChannelSelectMenuBuilder,
   ChannelType,
-  ButtonInteraction,
+  ComponentType,
+  EmbedBuilder,
+  PermissionsBitField,
+  RoleSelectMenuBuilder,
 } from "discord.js";
-import { CONSTANTS } from "../../config/constants.js";
-import { prisma } from "../../database/client.js";
-import type { GuildConfig } from "../../generated/prisma/client.js";
 import { config } from "../../config/config.js";
+import { prisma } from "../../database/client.js";
 import { logger } from "../../utils/logger.js";
+import { CONSTANTS } from "../../config/constants.js";
 import { SubCommand } from "../../types/UnifiedCommand.js";
-import { GuildConfigService } from "../../services/GuildConfigService.js";
+import { logCommandError } from "../../middleware/commandLogger.js";
 
-type RoleCategoryKey =
-  | "directiveRoles"
-  | "seniorHrRoles"
-  | "managementRoles"
-  | "supervisorRoles"
-  | "administratorRoles"
-  | "moderatorRoles";
-
-type ChannelCategoryKey = "infractionChannel" | "logsChannel";
-
-type ConfigCategoryKey = RoleCategoryKey | ChannelCategoryKey;
-
-type ConfigCategory =
+/**
+ * One prompt in the setup wizard. Add a new entry here to add a new step —
+ * nothing else in this file needs to change. `key` must match a field on
+ * the Prisma `GuildConfig` model.
+ */
+type SetupStep =
   | {
       type: "role";
-      key: RoleCategoryKey;
+      key: string;
       title: string;
       description: string;
+      /** Defaults: min 0, max 25 (i.e. optional, multi-select). */
+      minValues?: number;
+      maxValues?: number;
     }
   | {
       type: "channel";
-      key: ChannelCategoryKey;
+      key: string;
       title: string;
       description: string;
       channelTypes?: ChannelType[];
+      /** Whether a channel must be selected to proceed. Default: false. */
+      required?: boolean;
     };
 
-const CONFIG_CATEGORIES: ConfigCategory[] = [
+const SETUP_STEPS: SetupStep[] = [
   {
     type: "role",
     key: "directiveRoles",
     title: "Directive Roles",
-    description: "Highest authority in the server.",
+    description:
+      "Select one or more Directive roles that should have the highest authority in the server.",
   },
   {
     type: "role",
     key: "seniorHrRoles",
     title: "Senior Management Roles",
-    description: "Above Management level.",
+    description:
+      "Select one or more Senior Management roles that are above Management.",
   },
   {
     type: "role",
     key: "managementRoles",
     title: "Management Roles",
-    description: "Above Internal Affairs level.",
+    description:
+      "Select one or more Management roles that are above Internal Affairs.",
   },
   {
     type: "role",
     key: "supervisorRoles",
-    title: "Internal Affairs Roles",
-    description: "Can execute /erlc run and higher-level actions.",
+    title: "Supervisor Roles",
+    description:
+      "Select one or more Supervisor roles that can execute /erlc run and higher-level actions.",
   },
   {
     type: "role",
     key: "administratorRoles",
     title: "Admin Roles",
-    description: "Treated as server administration roles.",
+    description:
+      "Select one or more roles that should be treated as server administration roles.",
   },
   {
     type: "role",
     key: "moderatorRoles",
     title: "Moderator Roles",
-    description: "Can use moderator tools and /erlc players.",
+    description:
+      "Select one or more roles that should be able to use moderator tools and /erlc players.",
   },
   {
     type: "channel",
     key: "infractionChannel",
     title: "Infraction Channel",
-    description: "Channel used for sending infraction logs.",
+    description:
+      "Select a channel to set as the infraction channel that will be used for sending infractions.",
     channelTypes: [ChannelType.GuildText],
+    required: true,
   },
   {
     type: "channel",
     key: "logsChannel",
     title: "Logs Channel",
-    description: "Channel used for general server activity and audit logs.",
+    description:
+      "Select a channel to set as the general logs channel, used for server activity and audit logging.",
     channelTypes: [ChannelType.GuildText],
+    required: true,
   },
 ];
 
-function createConfigEmbed(guildConfig: GuildConfig | null) {
-  const embed = new EmbedBuilder()
-    .setTitle("Server Configuration")
-    .setDescription("Current configuration for this server")
-    .setColor(CONSTANTS.EMBED_COLOR)
-    .setTimestamp();
+/** Formats a step's current selection for display in an embed field. */
+function formatSelection(step: SetupStep, values: string[]): string {
+  if (values.length === 0) return "None selected";
 
-  if (!guildConfig) {
-    embed.addFields({
-      name: "Configuration",
-      value: "No configuration has been created yet.",
-    });
-
-    return embed;
-  }
-
-  for (const category of CONFIG_CATEGORIES) {
-    if (category.type === "role") {
-      const roles = guildConfig[category.key];
-      const rolesDisplay =
-        Array.isArray(roles) && roles.length > 0
-          ? roles.map((id) => `<@&${id}>`).join(", ")
-          : "No roles assigned";
-
-      embed.addFields({
-        name: category.title,
-        value: rolesDisplay,
-        inline: false,
-      });
-    } else {
-      const channelId = guildConfig[category.key];
-      embed.addFields({
-        name: category.title,
-        value: channelId ? `<#${channelId}>` : "Not set",
-        inline: false,
-      });
-    }
-  }
-
-  return embed;
+  return step.type === "channel"
+    ? `<#${values[0]}>`
+    : values.map((id) => `<@&${id}>`).join(", ");
 }
 
-function createEditButtons() {
-  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-  let currentRow = new ActionRowBuilder<ButtonBuilder>();
-  let buttonCount = 0;
+/** Builds the select menu + action row for a single step. */
+function buildStepComponents(step: SetupStep) {
+  const customId = `setup_select_${step.key}`;
 
-  for (const category of CONFIG_CATEGORIES) {
-    if (buttonCount === 5) {
-      rows.push(currentRow);
-      currentRow = new ActionRowBuilder<ButtonBuilder>();
-      buttonCount = 0;
-    }
+  if (step.type === "channel") {
+    const menu = new ChannelSelectMenuBuilder()
+      .setCustomId(customId)
+      .setPlaceholder(`Select ${step.title}`)
+      .setMinValues(step.required ? 1 : 0)
+      .setMaxValues(1);
 
-    const button = new ButtonBuilder()
-      .setCustomId(`config_edit_${category.key}`)
-      .setLabel(`Edit ${category.title}`)
-      .setStyle(1); // Blue button
+    if (step.channelTypes) menu.setChannelTypes(step.channelTypes);
 
-    currentRow.addComponents(button);
-    buttonCount++;
+    return {
+      row: new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(menu),
+      componentType: ComponentType.ChannelSelect as const,
+      customId,
+    };
   }
 
-  if (currentRow.components.length > 0) {
-    rows.push(currentRow);
-  }
+  const menu = new RoleSelectMenuBuilder()
+    .setCustomId(customId)
+    .setPlaceholder(`Select ${step.title}`)
+    .setMinValues(step.minValues ?? 0)
+    .setMaxValues(step.maxValues ?? 25);
 
-  return rows;
+  return {
+    row: new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(menu),
+    componentType: ComponentType.RoleSelect as const,
+    customId,
+  };
 }
 
 export default {
-  name: "configuration",
-  description: "View or edit the server's role-based access configuration.",
-  aliases: ["config", "cfg"],
+  name: "setup",
+  description: "Setup the server's configuration",
   execute: async (ctx) => {
-    await ctx.defer();
-
-    if (!ctx.guild) {
-      throw new Error("This command can only be used in a server.");
-    }
-
-    const guild = ctx.guild;
-    const guildId = guild.id;
-
-    const isSuperAdmin = ctx.user.id === config.superAdminId;
-    const isAdmin = ctx.member?.permissions?.has(
-      PermissionsBitField.Flags.Administrator,
-    );
-    if (!isSuperAdmin && !isAdmin) {
-      throw new Error(
-        "Only a server administrator or the super admin can run configuration.",
-      );
-    }
-
     try {
-      let guildConfig = await prisma.guildConfig.findUnique({
-        where: { guildId },
-      });
-      if (!guildConfig) {
+      if (!ctx.guild) {
+        throw new Error("Setup must be run inside a guild.");
+      }
+
+      await ctx.defer();
+
+      const isSuperAdmin = ctx.user.id === config.superAdminId;
+      const isAdmin = ctx.member?.permissions?.has(
+        PermissionsBitField.Flags.Administrator,
+      );
+      if (!isSuperAdmin && !isAdmin) {
         throw new Error(
-          "This server has not been set up yet. Please run /server setup first.",
+          "Only a server administrator or the super admin can run setup.",
         );
       }
 
-      const configEmbed = createConfigEmbed(guildConfig);
-      const editButtons = createEditButtons();
+      const introEmbed = new EmbedBuilder()
+        .setTitle("Server Setup")
+        .setDescription(
+          "We will now configure role-based access for ERLC commands. For each prompt, select one or more roles (or a channel, where asked) — submit without selecting anything if a step is optional and doesn't apply.",
+        )
+        .setColor(CONSTANTS.EMBED_COLOR)
+        .setTimestamp();
+      await ctx.editReply({ embeds: [introEmbed], components: [] });
 
-      const message = await ctx.editReply({
-        embeds: [configEmbed],
-        components: editButtons,
-      });
+      // Every step's selection, always stored as an array — a channel step
+      // just has at most one entry — so downstream logic doesn't need to
+      // branch on step type.
+      const selectedValues: Record<string, string[]> = {};
 
-      const waitForButton = async (): Promise<void> => {
-        const buttonCollector = message.createMessageComponentCollector({
-          componentType: ComponentType.Button,
-          time: 60000,
-        });
+      for (const step of SETUP_STEPS) {
+        const { row, componentType, customId } = buildStepComponents(step);
 
-        buttonCollector.on(
-          "collect",
-          async (buttonInteraction: ButtonInteraction) => {
-            if (buttonInteraction.user.id !== ctx.user.id) {
-              await buttonInteraction.reply({
-                content:
-                  "Only the user who initiated the configuration command can interact with these buttons.",
-                flags: MessageFlags.Ephemeral,
-              });
-              return;
-            }
+        const stepEmbed = new EmbedBuilder()
+          .setTitle(`Configure ${step.title}`)
+          .setDescription(step.description)
+          .addFields(
+            {
+              name: "Instructions",
+              value:
+                step.type === "channel" && step.required
+                  ? "Choose a channel from the menu below."
+                  : "Choose one or more from the menu below. If none apply, submit without selecting any.",
+            },
+            { name: "Current selection", value: "None selected" },
+          )
+          .setColor(CONSTANTS.EMBED_COLOR)
+          .setTimestamp();
 
-            const categoryKey = buttonInteraction.customId.replace(
-              "config_edit_",
-              "",
-            ) as ConfigCategoryKey;
+        await ctx.editReply({ embeds: [stepEmbed], components: [row] });
+        const stepMessage = await ctx.fetchReply();
 
-            const category = CONFIG_CATEGORIES.find(
-              (c) => c.key === categoryKey,
+        const collectorFilter = (i: any) =>
+          i.user.id === ctx.user.id && i.customId === customId;
+
+        try {
+          const selection = await stepMessage?.awaitMessageComponent({
+            filter: collectorFilter,
+            componentType,
+            time: 60000,
+          });
+
+          selectedValues[step.key] = Array.isArray(selection?.values)
+            ? selection.values
+            : [];
+
+          const selectedEmbed = new EmbedBuilder()
+            .setTitle(`Configure ${step.title}`)
+            .setDescription(
+              `${step.description}\n\n**Selected:** ${formatSelection(step, selectedValues[step.key])}`,
+            )
+            .setColor(CONSTANTS.EMBED_COLOR)
+            .setTimestamp();
+          await ctx.editReply({ embeds: [selectedEmbed], components: [] });
+        } catch (err: any) {
+          if (err?.code === "InteractionCollectorError") {
+            await ctx.editReply({
+              content:
+                "⏰ Setup timed out after 60 seconds. Please run `/server setup` again.",
+              embeds: [],
+              components: [],
+            });
+
+            logger.info(
+              `Setup timed out for ${ctx.user.tag} in guild ${ctx.guild.id}`,
             );
 
-            if (!category) {
-              await buttonInteraction.reply({
-                content: "Invalid category.",
-                flags: MessageFlags.Ephemeral,
-              });
-              return;
-            }
+            return;
+          }
 
-            const isChannel = category.type === "channel";
+          throw err;
+        }
+      }
 
-            await buttonInteraction.reply({
-              embeds: [
-                new EmbedBuilder()
-                  .setTitle(`Edit ${category.title}`)
-                  .setDescription(category.description)
-                  .addFields({
-                    name: "Instructions",
-                    value: isChannel
-                      ? "Choose a channel from the menu below. Submit without selecting to clear it."
-                      : "Choose one or more roles from the menu below. Submit without selecting roles to clear this category.",
-                  })
-                  .setColor(CONSTANTS.EMBED_COLOR)
-                  .setTimestamp(),
-              ],
-              components: [
-                isChannel
-                  ? new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
-                      new ChannelSelectMenuBuilder()
-                        .setCustomId(`config_select_${categoryKey}`)
-                        .setPlaceholder(
-                          `Select a channel for ${category.title}`,
-                        )
-                        .setChannelTypes(
-                          category.type === "channel" && category.channelTypes
-                            ? category.channelTypes
-                            : [ChannelType.GuildText],
-                        )
-                        .setMinValues(0)
-                        .setMaxValues(1),
-                    )
-                  : new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(
-                      new RoleSelectMenuBuilder()
-                        .setCustomId(`config_select_${categoryKey}`)
-                        .setPlaceholder(`Select roles for ${category.title}`)
-                        .setMinValues(0)
-                        .setMaxValues(25),
-                    ),
-              ],
-              flags: MessageFlags.Ephemeral,
-            });
+      // Build the Prisma payload generically from whatever steps ran, rather
+      // than listing each field by hand — new steps need no changes here.
+      const configData: Record<string, string | string[]> = {};
+      for (const step of SETUP_STEPS) {
+        const values = selectedValues[step.key] ?? [];
+        configData[step.key] =
+          step.type === "channel" ? (values[0] ?? "") : values;
+      }
 
-            const selectMessage = await buttonInteraction.fetchReply();
+      const savedConfig = await prisma.guildConfig.upsert({
+        where: { guildId: ctx.guild.id },
+        update: configData,
+        create: { guildId: ctx.guild.id, ...configData },
+      });
 
-            try {
-              const selectInteraction =
-                await selectMessage.awaitMessageComponent({
-                  componentType: isChannel
-                    ? ComponentType.ChannelSelect
-                    : ComponentType.RoleSelect,
-                  time: 60000,
-                  filter: (i) => i.user.id === ctx.user.id,
-                });
+      if (!savedConfig) {
+        throw new Error("Failed to save guild configuration.");
+      }
 
-              const newValue: string | string[] = isChannel
-                ? (selectInteraction.values[0] ?? "")
-                : selectInteraction.values;
-
-              (guildConfig as unknown as Record<string, string | string[]>)[
-                categoryKey
-              ] = newValue;
-
-              await GuildConfigService.updateConfig(guildId, {
-                [categoryKey]: newValue,
-              });
-
-              const updatedDescription = isChannel
-                ? newValue
-                  ? `Now set to: <#${newValue}>`
-                  : "Cleared — no channel set"
-                : (newValue as string[]).length > 0
-                  ? `Now set to: ${(newValue as string[])
-                      .map((id) => `<@&${id}>`)
-                      .join(", ")}`
-                  : "No roles assigned";
-
-              await selectInteraction.update({
-                embeds: [
-                  new EmbedBuilder()
-                    .setTitle(`${category.title} Updated`)
-                    .setDescription(updatedDescription)
-                    .setColor(CONSTANTS.EMBED_COLOR)
-                    .setTimestamp(),
-                ],
-                components: [],
-              });
-
-              await message.edit({
-                embeds: [createConfigEmbed(guildConfig)],
-                components: editButtons,
-              });
-
-              logger.info(
-                `Configuration updated for guild ${guildId} by ${ctx.user.tag}`,
-              );
-
-              // Restart the 60 second button timer
-              await waitForButton();
-            } catch {
-              await selectMessage.edit({
-                embeds: [
-                  new EmbedBuilder()
-                    .setTitle("Selection Timed Out")
-                    .setDescription("No selection was made within 60 seconds.")
-                    .setColor(CONSTANTS.EMBED_WARNING_COLOR),
-                ],
-                components: [],
-              });
-
-              // Return to the main configuration menu
-              await message.edit({
-                embeds: [createConfigEmbed(guildConfig)],
-                components: editButtons,
-              });
-
-              await waitForButton();
-            }
-          },
+      // Same generic pattern for the summary — one field per step, in the
+      // order steps are defined, with no per-field hardcoding.
+      const completedEmbed = new EmbedBuilder()
+        .setTitle("Server Setup Complete")
+        .setDescription(
+          "Server role configuration has been saved successfully.",
+        )
+        .setColor(CONSTANTS.EMBED_SUCCESS_COLOR)
+        .setTimestamp()
+        .addFields(
+          SETUP_STEPS.map((step) => ({
+            name: step.title,
+            value: formatSelection(step, selectedValues[step.key] ?? []),
+          })),
         );
 
-        buttonCollector.once("end", (_, reason) => {
-          if (reason !== "time") return;
-
-          const disabledRows = editButtons.map((row) => {
-            const newRow = new ActionRowBuilder<ButtonBuilder>();
-
-            row.components.forEach((component) => {
-              if (component instanceof ButtonBuilder) {
-                newRow.addComponents(
-                  ButtonBuilder.from(component).setDisabled(true),
-                );
-              }
-            });
-
-            return newRow;
-          });
-
-          ctx
-            .editReply({
-              content:
-                "⏰ Configuration timed out after 60 seconds. Please run `/server configuration` again.",
-              embeds: [],
-              components: disabledRows,
-            })
-            .catch((err) => logger.error("Failed to update timeout:", err));
-        });
-      };
-
-      await waitForButton();
-    } catch (error) {
-      logger.error("Configuration command error:", error);
-
-      try {
-        if (ctx.deferred) {
-          await ctx.editReply({
-            content: `Error: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-            embeds: [],
-            components: [],
-          });
-        } else if (!ctx.replied) {
-          await ctx.reply({
-            content: `Error: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-            flags: MessageFlags.Ephemeral,
-          });
-        }
-      } catch (e) {
-        logger.error("Failed sending error:", e);
-      }
+      await ctx.editReply({ embeds: [completedEmbed], components: [] });
+    } catch (e) {
+      logger.error("Setup command failed:", e);
+      await logCommandError(ctx, "/server setup", e).catch(() => {});
+      await ctx
+        .editReply({
+          content: "❌ Something went wrong running setup.",
+          embeds: [],
+          components: [],
+        })
+        .catch(() => {});
     }
   },
 } satisfies SubCommand;

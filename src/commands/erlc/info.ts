@@ -8,6 +8,7 @@ import {
 } from "../../config/constants.js";
 import { formatFieldsFromObject } from "../../utils/formatters.js";
 import { EmbedBuilder } from "discord.js";
+import { logCommandError } from "../../middleware/commandLogger.js";
 
 export default {
   name: "info",
@@ -82,6 +83,7 @@ export default {
       }
     } catch (err) {
       logger.error("Error fetching ERLC API:", err);
+      await logCommandError(ctx, "/erlc info", err).catch(() => {});
       try {
         if (ctx.deferred || ctx.replied) {
           await ctx.editReply({ content: "Failed to fetch ERLC stats." });

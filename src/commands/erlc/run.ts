@@ -10,6 +10,7 @@ import { config } from "../../config/config.js";
 import { ErlcServerInfo, SUPER_ADMIN_ID } from "../../config/constants.js";
 import { MessageFlags } from "discord.js";
 import { GuildConfigService } from "../../services/GuildConfigService.js";
+import { logCommandError } from "../../middleware/commandLogger.js";
 
 export default {
   name: "run",
@@ -115,6 +116,7 @@ export default {
       await ctx.editReply({ content: "", embeds: [embed], components: [] });
     } catch (error) {
       logger.error(`Error running ERLC command:`, error);
+      await logCommandError(ctx, "/erlc run", error).catch(() => {});
       const embed = createErrorEmbed(
         "Failed to run ERLC command",
         error instanceof Error ? error.message : "An unknown error occurred.",

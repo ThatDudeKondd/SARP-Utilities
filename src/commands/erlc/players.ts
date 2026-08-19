@@ -10,6 +10,7 @@ import { ErlcServerInfo, SUPER_ADMIN_ID } from "../../config/constants.js";
 import { logger } from "../../utils/logger.js";
 import { MessageFlags } from "discord.js";
 import { GuildConfigService } from "../../services/GuildConfigService.js";
+import { logCommandError } from "../../middleware/commandLogger.js";
 
 export default {
   name: "players",
@@ -107,6 +108,7 @@ export default {
       await ctx.editReply({ embeds: [embed] });
     } catch (err) {
       logger.error(`Failed to fetch players: ${err}`);
+      await logCommandError(ctx, "/erlc players", err).catch(() => {});
       const errorEmbed = createErrorEmbed(
         "Failed to fetch and show ERLC players",
         err instanceof Error ? err.message : "An unknown error occured.",
