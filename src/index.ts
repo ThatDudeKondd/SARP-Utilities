@@ -63,7 +63,7 @@ async function initializeBot() {
 }
 
 // Event listeners
-client.on("ready", (readyClient) => onReady(readyClient, slashData));
+client.on("clientReady", (readyClient) => onReady(readyClient, slashData));
 
 client.on("messageCreate", (message) =>
   onMessageCreate(message, commands, aliases),

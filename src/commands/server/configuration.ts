@@ -145,8 +145,8 @@ function buildStepComponents(step: SetupStep) {
 }
 
 export default {
-  name: "setup",
-  description: "Setup the server's configuration",
+  name: "configuration",
+  description: "View or edit the server's role-based access configuration.",
   execute: async (ctx) => {
     try {
       if (!ctx.guild) {
