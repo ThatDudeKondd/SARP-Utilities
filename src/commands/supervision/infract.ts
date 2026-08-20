@@ -88,7 +88,7 @@ export default defineCommand({
         iconURL: infractee.displayAvatarURL(),
       });
       await infracteeDms.send({
-        embeds: [dmEmbed],
+        content: `You have been infracted in **${ctx.guild?.name}** for the following reason:`,
       });
     }
 
