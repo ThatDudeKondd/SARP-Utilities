@@ -73,22 +73,31 @@ export default defineCommand({
       guildData?.infractionChannel || "",
     );
 
-    const infracteeDms = ctx.users?.cache.get(infractee.id)?.dmChannel;
-
     if (infractionChannel?.isTextBased()) {
       await infractionChannel.send({
         content: `<@${infractee.id}>`,
         embeds: [infractionEmbed],
       });
     }
-    logger.info(`${infracteeDms?.isTextBased()}`);
+
     const dmEmbed = infractionEmbed.setFooter({
       text: "This message was sent to you privately.",
       iconURL: infractee.displayAvatarURL(),
     });
-    await infracteeDms?.send({
-      embeds: [dmEmbed],
-    });
+
+    try {
+      // User.send() opens a DM channel automatically -- no need to check
+      // .dmChannel first, which only reflects what's already cached and
+      // is usually undefined for a user the bot hasn't DMed before.
+      await infractee.send({ embeds: [dmEmbed] });
+    } catch (dmError) {
+      // Most commonly the infractee has DMs closed -- log it, but don't
+      // fail the whole command over a DM that was never guaranteed to work.
+      logger.warn(
+        `Could not DM infraction to ${infractee.tag} (${infractee.id}):`,
+        dmError,
+      );
+    }
 
     const successEmbed = createSuccessEmbed(
       "Infraction Issued",
