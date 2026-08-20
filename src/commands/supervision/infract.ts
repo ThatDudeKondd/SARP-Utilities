@@ -61,7 +61,7 @@ export default defineCommand({
       },
     });
 
-    const embed = createInfractionEmbed({
+    const infractionEmbed = createInfractionEmbed({
       infractee,
       moderator: ctx.user,
       punishment,
@@ -73,10 +73,23 @@ export default defineCommand({
       guildData?.infractionChannel || "",
     );
 
+    const infracteeDms = ctx.users?.cache.get(infractee.id)?.dmChannel;
+
     if (infractionChannel?.isTextBased()) {
       await infractionChannel.send({
         content: `<@${infractee.id}>`,
-        embeds: [embed],
+        embeds: [infractionEmbed],
+      });
+    }
+
+    if (infracteeDms?.isTextBased()) {
+      await infracteeDms.send({
+        embeds: [
+          infractionEmbed.setFooter({
+            text: "This message was sent to you privately.",
+            iconURL: infractee.displayAvatarURL(),
+          }),
+        ],
       });
     }
 
@@ -86,7 +99,7 @@ export default defineCommand({
     );
 
     if (ctx.channel?.isSendable()) {
-      const reply = await ctx.channel.send({ embeds: [successEmbed] });
+      const reply = await ctx.editReply({ embeds: [successEmbed] });
       await new Promise((resolve) => setTimeout(resolve, 2000));
       await reply.delete();
     }

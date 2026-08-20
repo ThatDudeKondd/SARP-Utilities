@@ -92,13 +92,15 @@ export function createInfractionEmbed(
       {
         name: "User",
         value: `${infractee} (\`${infractee.id}\`)`,
-        inline: true,
+        inline: false,
       },
-      { name: "Punishment", value: punishment, inline: true },
-      { name: "Moderator", value: `${moderator}`, inline: true },
+      { name: "Punishment", value: punishment, inline: false },
       { name: "Reason", value: truncateString(reason) },
     )
-    .setFooter({ text: `Signed by ${moderator.tag}` });
+    .setFooter({
+      text: `Signed by ${moderator.tag}`,
+      iconURL: moderator.displayAvatarURL(),
+    });
 }
 
 export function truncateString(

@@ -8,6 +8,7 @@ import {
   Role,
   Client,
   MessageFlags,
+  UserManager,
 } from "discord.js";
 import { CommandOption } from "../types/UnifiedCommand.js";
 
@@ -84,6 +85,10 @@ export class CommandContext {
 
   get channel(): TextBasedChannel | null {
     return this.isSlash ? this._interaction!.channel : this.message!.channel;
+  }
+
+  get users(): UserManager | null {
+    return this.isSlash ? this._interaction!.client.users : this.client.users;
   }
 
   /** The underlying Message or Interaction, for anything not covered by this wrapper. */

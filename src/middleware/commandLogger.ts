@@ -1,5 +1,5 @@
 import { EmbedBuilder } from "discord.js";
-import { CommandContext } from "../utils/CommandContext.js";
+import { CommandContext } from "../utils/commandContext.js";
 import { CONSTANTS } from "../config/constants.js";
 import { sendToLogsChannel } from "../utils/logChannel.js";
 import { truncateString } from "../utils/formatters.js";

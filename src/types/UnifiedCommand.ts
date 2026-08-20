@@ -1,4 +1,4 @@
-import { CommandContext } from "../utils/CommandContext.js";
+import { CommandContext } from "../utils/commandContext.js";
 
 export interface CommandOption {
   name: string;

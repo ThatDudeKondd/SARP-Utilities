@@ -1,10 +1,13 @@
 import { Message, ChatInputCommandInteraction, MessageFlags } from "discord.js";
 import { logger } from "../utils/logger.js";
 import { checkCommandCooldown } from "../middleware/cooldown.js";
-import { logCommandExecution, logCommandError } from "../middleware/commandLogger.js";
+import {
+  logCommandExecution,
+  logCommandError,
+} from "../middleware/commandLogger.js";
 import { GuildConfigService } from "./GuildConfigService.js";
 import { UnifiedCommand, SubCommand } from "../types/UnifiedCommand.js";
-import { CommandContext } from "../utils/CommandContext.js";
+import { CommandContext } from "../utils/commandContext.js";
 import { CONSTANTS } from "../config/constants.js";
 import { prisma } from "../database/client.js";
 
