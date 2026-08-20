@@ -96,6 +96,21 @@ export class CommandContext {
     return (this.message ?? this._interaction)!;
   }
 
+  /**
+   * Resolves the invoking message's channel to something send()-able,
+   * narrowing away the union members (e.g. PartialGroupDMChannel) that
+   * lack a send method or have inconsistent return types.
+   */
+  private getSendableChannel() {
+    const channel = this.message!.channel;
+
+    if (!channel.isSendable()) {
+      throw new Error("Cannot send messages in this channel.");
+    }
+
+    return channel;
+  }
+
   async reply(content: string | ReplyOptions): Promise<unknown> {
     const payload = typeof content === "string" ? { content } : content;
 
@@ -112,7 +127,9 @@ export class CommandContext {
     // Prefix commands cannot use Discord interaction flags
     const { flags, ...messagePayload } = payload;
 
-    this.lastReply = await this.message!.reply(messagePayload as any);
+    this.lastReply = await this.getSendableChannel().send(
+      messagePayload as any,
+    );
 
     return this.lastReply;
   }
@@ -133,7 +150,9 @@ export class CommandContext {
     const { flags, ...messagePayload } = content;
 
     if (!this.lastReply) {
-      this.lastReply = await this.message!.reply(messagePayload as any);
+      this.lastReply = await this.getSendableChannel().send(
+        messagePayload as any,
+      );
       return this.lastReply;
     }
 
