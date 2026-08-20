@@ -82,15 +82,14 @@ export default defineCommand({
       });
     }
     logger.info(`${infracteeDms?.isTextBased()}`);
-    if (infracteeDms?.isTextBased()) {
-      const dmEmbed = infractionEmbed.setFooter({
-        text: "This message was sent to you privately.",
-        iconURL: infractee.displayAvatarURL(),
-      });
-      await infracteeDms.send({
-        content: `You have been infracted in **${ctx.guild?.name}** for the following reason:`,
-      });
-    }
+    const dmEmbed = infractionEmbed.setFooter({
+      text: "This message was sent to you privately.",
+      iconURL: infractee.displayAvatarURL(),
+    });
+    await infracteeDms?.send({
+      content: `You have been infracted in **${ctx.guild?.name}** for the following reason:`,
+      embeds: [dmEmbed],
+    });
 
     const successEmbed = createSuccessEmbed(
       "Infraction Issued",
