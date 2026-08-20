@@ -81,7 +81,7 @@ export default defineCommand({
         embeds: [infractionEmbed],
       });
     }
-
+    logger.info(`${infracteeDms?.isTextBased()}`);
     if (infracteeDms?.isTextBased()) {
       const dmEmbed = infractionEmbed.setFooter({
         text: "This message was sent to you privately.",
