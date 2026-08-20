@@ -135,7 +135,5 @@ export default defineCommand({
       await new Promise((resolve) => setTimeout(resolve, 2000));
       await reply.delete();
     }
-
-    logger.info("Infractee Database Data:", infracteeData);
   },
 });
