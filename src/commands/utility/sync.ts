@@ -1,8 +1,10 @@
-import { EmbedBuilder } from "discord.js";
+import { EmbedBuilder, MessageFlags } from "discord.js";
 import { defineCommand } from "../../utils/defineCommand.js";
 import { CONSTANTS } from "../../config/constants.js";
 import { syncGuildMembers } from "../../services/SyncService.js";
 import { sendToLogsChannel } from "../../utils/logChannel.js";
+import { GuildConfigService } from "../../services/GuildConfigService.js";
+import { createErrorEmbed } from "../../utils/formatters.js";
 
 const UPDATE_INTERVAL = 10;
 
@@ -12,9 +14,47 @@ export default defineCommand({
   cooldown: 3000,
   execute: async (ctx) => {
     await ctx.defer();
-
     const guild = ctx.guild;
     if (!guild) return;
+
+    const guildConfig = await GuildConfigService.getConfig(guild.id);
+    if (!guildConfig) {
+      await ctx.editReply({
+        embeds: [
+          [
+            new EmbedBuilder()
+              .setTitle("❌ Configuration not found")
+              .setDescription("Please configure the server first.")
+              .setColor(CONSTANTS.EMBED_ERROR_COLOR)
+              .setTimestamp(),
+          ],
+        ],
+      });
+      return;
+    }
+
+    const canRunRoles = [
+      ...(guildConfig.directiveRoles || []),
+      ...(guildConfig.seniorHrRoles || []),
+    ];
+
+    const hasRunPerms = ctx.member?.roles?.cache.some((role) =>
+      canRunRoles.includes(role.id),
+    );
+
+    if (!hasRunPerms) {
+      const embed = createErrorEmbed(
+        "You do not have permission to run this command.",
+        "This command is restricted to Supervisor+.",
+      );
+
+      await ctx.editReply({
+        embeds: [embed],
+        flags: MessageFlags.Ephemeral,
+      });
+
+      return;
+    }
 
     const progressEmbed = (synced: number, failed: number, total: number) =>
       new EmbedBuilder()

@@ -8,7 +8,6 @@ import {
 import { GuildConfigService } from "./GuildConfigService.js";
 import { UnifiedCommand, SubCommand } from "../types/UnifiedCommand.js";
 import { CommandContext } from "../utils/commandContext.js";
-import { prisma } from "../database/client.js";
 
 export class CommandHandler {
   /**
@@ -22,9 +21,9 @@ export class CommandHandler {
     // Ignore bot messages
     if (message.author.bot) return;
 
-    const guildConfig = await prisma.guildConfig.findUnique({
-      where: { guildId: message.guild?.id },
-    });
+    const guildConfig = await GuildConfigService.getConfig(
+      message.guild?.id ?? "",
+    );
 
     // Get guild config for custom prefix
     let prefix: string = guildConfig?.prefix as string;

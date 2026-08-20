@@ -8,11 +8,11 @@ import {
   RoleSelectMenuBuilder,
 } from "discord.js";
 import { config } from "../../config/config.js";
-import { prisma } from "../../database/client.js";
 import { logger } from "../../utils/logger.js";
 import { CONSTANTS } from "../../config/constants.js";
 import { SubCommand } from "../../types/UnifiedCommand.js";
 import { logCommandError } from "../../middleware/commandLogger.js";
+import { GuildConfigService } from "../../services/GuildConfigService.js";
 
 /**
  * One prompt in the setup wizard. Add a new entry here to add a new step —
@@ -252,11 +252,10 @@ export default {
           step.type === "channel" ? (values[0] ?? "") : values;
       }
 
-      const savedConfig = await prisma.guildConfig.upsert({
-        where: { guildId: ctx.guild.id },
-        update: configData,
-        create: { guildId: ctx.guild.id, ...configData },
-      });
+      const savedConfig = await GuildConfigService.updateConfig(
+        ctx.guild.id,
+        configData,
+      );
 
       if (!savedConfig) {
         throw new Error("Failed to save guild configuration.");

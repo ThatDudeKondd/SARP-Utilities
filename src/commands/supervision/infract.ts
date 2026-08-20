@@ -2,9 +2,12 @@ import { prisma } from "../../database/client.js";
 import { defineCommand } from "../../utils/defineCommand.js";
 import { logger } from "../../utils/logger.js";
 import {
+  createErrorEmbed,
   createInfractionEmbed,
   createSuccessEmbed,
 } from "../../utils/formatters.js";
+import { GuildConfigService } from "../../services/GuildConfigService.js";
+import { MessageFlags } from "discord.js";
 
 export default defineCommand({
   name: "infract",
@@ -43,9 +46,32 @@ export default defineCommand({
       where: { userId: infractee?.id },
     });
 
-    const guildData = await prisma.guildConfig.findUnique({
-      where: { guildId: ctx.guild?.id },
-    });
+    const guildData = await GuildConfigService.getConfig(ctx.guild?.id ?? "");
+
+    const canRunRoles = [
+      ...(guildData?.directiveRoles || []),
+      ...(guildData?.seniorHrRoles || []),
+      ...(guildData?.managementRoles || []),
+      ...(guildData?.supervisorRoles || []),
+    ];
+
+    const hasRunPerms = ctx.member?.roles?.cache.some((role) =>
+      canRunRoles.includes(role.id),
+    );
+
+    if (!hasRunPerms) {
+      const embed = createErrorEmbed(
+        "You do not have permission to run this command.",
+        "This command is restricted to Supervisor+.",
+      );
+
+      await ctx.editReply({
+        embeds: [embed],
+        flags: MessageFlags.Ephemeral,
+      });
+
+      return;
+    }
 
     if (!infractee || !punishment || !reason) {
       return;
