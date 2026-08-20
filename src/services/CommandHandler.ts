@@ -8,7 +8,6 @@ import {
 import { GuildConfigService } from "./GuildConfigService.js";
 import { UnifiedCommand, SubCommand } from "../types/UnifiedCommand.js";
 import { CommandContext } from "../utils/commandContext.js";
-import { CONSTANTS } from "../config/constants.js";
 import { prisma } from "../database/client.js";
 
 export class CommandHandler {

@@ -83,13 +83,12 @@ export default defineCommand({
     }
 
     if (infracteeDms?.isTextBased()) {
+      const dmEmbed = infractionEmbed.setFooter({
+        text: "This message was sent to you privately.",
+        iconURL: infractee.displayAvatarURL(),
+      });
       await infracteeDms.send({
-        embeds: [
-          infractionEmbed.setFooter({
-            text: "This message was sent to you privately.",
-            iconURL: infractee.displayAvatarURL(),
-          }),
-        ],
+        embeds: [dmEmbed],
       });
     }
 
