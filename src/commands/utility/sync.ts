@@ -45,7 +45,7 @@ export default defineCommand({
     if (!hasRunPerms) {
       const embed = createErrorEmbed(
         "You do not have permission to run this command.",
-        "This command is restricted to Supervisor+.",
+        "This command is restricted to Senior Management and above.",
       );
 
       await ctx.editReply({
