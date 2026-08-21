@@ -25,6 +25,15 @@ validateEnv();
 
 const client = new Client(BOT_CONFIG);
 
+// TEMPORARY DIAGNOSTIC: confirm or rule out REST rate-limit queueing as the
+// cause of felt lag across all commands. Safe to remove once diagnosed --
+// this only logs, it doesn't change behavior.
+client.rest.on("rateLimited", (info) => {
+  logger.warn(
+    `⏳ Rate limited on ${info.route} -- waiting ${info.timeToReset}ms (global: ${info.global})`,
+  );
+});
+
 // Loaded once at startup: every command file yields one entry here, registered
 // as both a prefix command (byName/byAlias) and a slash command (slashData).
 let commands = new Map<string, UnifiedCommand>();
