@@ -84,8 +84,8 @@ export function createInfractionEmbed(
     })
     .setTitle(
       caseNumber !== undefined
-        ? `#  Infraction Issued — Case #${caseNumber}`
-        : "#  Infraction Issued",
+        ? `Infraction Issued — Case #${caseNumber}`
+        : "Infraction Issued",
     )
     .setThumbnail(infractee.displayAvatarURL({ size: 256 }))
     .addFields(
