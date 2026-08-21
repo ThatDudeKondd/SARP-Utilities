@@ -212,11 +212,26 @@ export class CommandHandler {
   ): Promise<void> {
     try {
       logger.info(`⚡ Executing command: ${commandDisplay} by ${userTag}`);
-      await logCommandExecution(ctx, commandDisplay);
+
+      // Fire-and-forget: logging to the guild's channel is an audit trail,
+      // not something the user should have to wait on. Awaiting this
+      // added a real DB lookup + Discord API round trip in front of every
+      // single command's actual execution -- felt as lag on everything,
+      // not just whatever the log message itself was slow to send.
+      logCommandExecution(ctx, commandDisplay).catch((err) =>
+        logger.error("Failed to log command execution:", err),
+      );
+
       await command.execute?.(ctx);
     } catch (error) {
       logger.error(`Error executing command ${command.name}:`, error);
-      await logCommandError(ctx, commandDisplay, error).catch(() => {});
+
+      // Same reasoning: don't make the user's error reply wait on the
+      // log send either.
+      logCommandError(ctx, commandDisplay, error).catch((err) =>
+        logger.error("Failed to log command error:", err),
+      );
+
       await ctx
         .reply({
           content: "❌ An error occurred while executing the command",
