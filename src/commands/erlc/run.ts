@@ -1,4 +1,3 @@
-import { prisma } from "../../database/client.js";
 import { SubCommand } from "../../types/UnifiedCommand.js";
 import {
   createErrorEmbed,
@@ -44,16 +43,11 @@ export default {
       ctx.member?.roles?.cache.some((role) => canRunRoles.includes(role.id));
 
     if (!hasRunPerms) {
-      const embed = createErrorEmbed(
+      const errorEmbed = createErrorEmbed(
         "You do not have permission to run this command.",
-        "This command is restricted to Supervisor+.",
+        "This command can only be run by staff members.",
       );
-
-      await ctx.editReply({
-        embeds: [embed],
-        flags: MessageFlags.Ephemeral,
-      });
-
+      await ctx.editReply({ embeds: [errorEmbed] });
       return;
     }
 

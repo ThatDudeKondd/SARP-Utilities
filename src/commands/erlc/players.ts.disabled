@@ -1,7 +1,11 @@
 import { SubCommand } from "../../types/UnifiedCommand.js";
 import { config } from "../../config/config.js";
-import { baseEmbed, createErrorEmbed } from "../../utils/formatters.js";
-import { CONSTANTS, ErlcServerInfo } from "../../config/constants.js";
+import {
+  createErrorEmbed,
+  createInfoEmbed,
+  isPartialMatch,
+} from "../../utils/formatters.js";
+import { ErlcServerInfo } from "../../config/constants.js";
 import { logger } from "../../utils/logger.js";
 import { MessageFlags } from "discord.js";
 import { GuildConfigService } from "../../services/GuildConfigService.js";
@@ -66,23 +70,48 @@ export default {
       const players = Array.isArray(data.Players)
         ? data.Players
         : data.Players || [];
-      let staff = [];
-      let nonStaff = [];
-      for (const player in players) {
-        const playerData = players[player];
-        const rank = playerData.Permission;
-        if (rank !== "Normal") {
-          staff.push(playerData);
-        } else {
-          nonStaff.push(playerData);
+      const playerLines = players.slice(0, 25).map((player) => {
+        if (!indexUsername) {
+          const localPlayer = player.Player ?? "Unknown";
+          const playerId = localPlayer.split(":")[1] ?? "";
+          const username = localPlayer.split(":")[0] ?? "Unknown";
+
+          const url = config.robloxUserPageUrl.replace("<USER_ID>", playerId);
+
+          return `[${username}](${url}) - ${player.Team}${
+            player.Callsign && player.Callsign !== "undefined"
+              ? ` - ${player.Callsign}`
+              : ""
+          }`;
+        } else if (isPartialMatch(indexUsername, player.Player.split(":")[0])) {
+          const localPlayer = player.Player ?? "Unknown";
+          const playerId = localPlayer.split(":")[1] ?? "";
+          const username = localPlayer.split(":")[0] ?? "Unknown";
+
+          const url = config.robloxUserPageUrl.replace("<USER_ID>", playerId);
+
+          return `[${username}](${url}) - ${player.Team}${
+            player.Callsign && player.Callsign !== "undefined"
+              ? ` - ${player.Callsign}`
+              : ""
+          }`;
         }
+      });
+      const totalCount = players.length;
+
+      let description = `Total players: ${totalCount} \n\n${playerLines.join("")}`;
+
+      if (playerLines.length === 0) {
+        description += "\n\nNo players online.\n\n";
       }
 
-      logger.info(
-        `Fetched ${players.length} players from ERLC API, ${staff.length} staff and ${nonStaff.length} non-staff.`,
-      );
+      if (players.length > 25) {
+        description += `\n…and ${players.length - 25} more player(s).`;
+      }
 
-      const embed = baseEmbed(CONSTANTS.EMBED_COLOR);
+      const serverName = data.Name || "ERLC Server";
+      const embed = createInfoEmbed(serverName, description);
+      await ctx.editReply({ embeds: [embed] });
     } catch (err) {
       logger.error(`Failed to fetch players: ${err}`);
       await logCommandError(ctx, "/erlc players", err).catch(() => {});

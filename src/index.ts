@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { Client, messageLink, SlashCommandBuilder } from "discord.js";
+import { Client, SlashCommandBuilder } from "discord.js";
 import { resolve } from "path";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
@@ -14,6 +14,8 @@ import { onInteractionCreate } from "./events/interactionCreate.js";
 import { CommandLoader } from "./loaders/unifiedCommandLoader.js";
 import { setCommandRegistry } from "./loaders/commandRegistry.js";
 import { UnifiedCommand } from "./types/UnifiedCommand.js";
+// djsko currently does not publish TypeScript declarations.
+// @ts-expect-error -- use the package's runtime export until declarations are available.
 import { Jishaku } from "djsko";
 
 // Get __dirname equivalent for ESM
@@ -42,6 +44,7 @@ const jsk = new Jishaku(client, {
   shellOwners: ["726507399640252416"],
   encoding: "UTF-8", // Use 'Shift_JIS' for Japanese Windows shell output.
   updateCommand: "/opt/sarp-project/SARP-Utilities/deploy-sarp.sh",
+  restartCommand: "systemctl --user restart sarp-utilities.service",
 });
 
 async function initializeBot() {

@@ -63,12 +63,12 @@ const CONFIG_CATEGORIES: ConfigCategory[] = [
     type: "role",
     key: "managementRoles",
     title: "Management Roles",
-    description: "Above Internal Affairs level.",
+    description: "Above Supervisor level.",
   },
   {
     type: "role",
     key: "supervisorRoles",
-    title: "Internal Affairs Roles",
+    title: "Supervisor Roles",
     description: "Can execute /erlc run and higher-level actions.",
   },
   {

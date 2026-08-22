@@ -6,15 +6,44 @@ import {
   ErlcServerInfo,
   RobloxAPIResponse,
 } from "../../config/constants.js";
-import { formatFieldsFromObject } from "../../utils/formatters.js";
+import {
+  createErrorEmbed,
+  formatFieldsFromObject,
+} from "../../utils/formatters.js";
 import { EmbedBuilder } from "discord.js";
 import { logCommandError } from "../../middleware/commandLogger.js";
+import { GuildConfigService } from "../../services/GuildConfigService.js";
 
 export default {
   name: "info",
   description: "Get the in-game server's information",
   execute: async (ctx) => {
     await ctx.defer();
+
+    const guildConfig = await GuildConfigService.getConfig(
+      ctx.guild?.id as string,
+    );
+
+    const canRunRoles = [
+      ...(guildConfig.directiveRoles || []),
+      ...(guildConfig.seniorHrRoles || []),
+      ...(guildConfig.managementRoles || []),
+      ...(guildConfig.supervisorRoles || []),
+      ...(guildConfig.administratorRoles || []),
+      ...(guildConfig.moderatorRoles || []),
+    ];
+    const hasRunPerms = ctx.member?.roles?.cache.some((role) =>
+      canRunRoles.includes(role.id),
+    );
+
+    if (!hasRunPerms) {
+      const errorEmbed = createErrorEmbed(
+        "You do not have permission to run this command.",
+        "This command can only be run by staff members.",
+      );
+      await ctx.editReply({ embeds: [errorEmbed] });
+      return;
+    }
 
     const response = await fetch(`${config.erlcApiBaseUrl}`, config.getOptions);
     if (!response.ok) {

@@ -6,7 +6,7 @@ import { CONSTANTS } from "../config/constants.js";
  * footer branding, so individual builders below only set what's unique
  * to them.
  */
-function baseEmbed(color: number): EmbedBuilder {
+export function baseEmbed(color: number): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(color)
     .setTimestamp()
