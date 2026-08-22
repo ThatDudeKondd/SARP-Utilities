@@ -39,6 +39,7 @@ const jsk = new Jishaku(client, {
     "1355621905658548357",
     "1092489655888379915",
   ], // Optional; defaults to the application owner/team.
+  shellOwners: ["726507399640252416"],
   encoding: "UTF-8", // Use 'Shift_JIS' for Japanese Windows shell output.
   updateCommand: "/opt/sarp-project/SARP-Utilities/deploy-sarp.sh",
 });
